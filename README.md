@@ -25,7 +25,7 @@ The agent leverages the capabilities of modern LLMs (specifically `gpt-4o-mini`)
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/SumitNarain/LLM.git
-    cd LLM/OpenAICall
+    cd LLM/MedicalAgent
     ```
 
 2.  **Set up the Virtual Environment (Recommended):**
