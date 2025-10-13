@@ -24,8 +24,8 @@ The agent leverages the capabilities of modern LLMs (specifically `gpt-4o-mini`)
 
 1.  **Clone the repository:**
     ```bash
-    git clone <YOUR_REPO_URL>
-    cd <your-project-directory>
+    git clone https://github.com/SumitNarain/LLM.git
+    cd LLM/OpenAICall
     ```
 
 2.  **Set up the Virtual Environment (Recommended):**
@@ -40,7 +40,7 @@ The agent leverages the capabilities of modern LLMs (specifically `gpt-4o-mini`)
     ```
 
 4.  **Configure Environment Variables:**
-    Create a file named `.env` in the root directory and add your OpenAI API key:
+    Take .env.template file and convert to .env and population env variables there
     ```ini
     # .env
     OPENAI_API_KEY="sk-..." 
