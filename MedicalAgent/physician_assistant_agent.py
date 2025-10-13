@@ -1,6 +1,31 @@
+"""
+Runs a structured, turn-based medical history interview using the OpenAI Agents SDK.
+
+The Agent manages the conversation flow, tracks the current section of the history
+(e.g., Presenting Complaint, Past Medical History), and formulates the next question.
+
+The communication between the orchestrator (this function) and the Agent is handled
+via a JSON string containing the current state:
+- User_Response (The patient's last answer)
+- History_So_Far (The running note of all collected history)
+- Current_Section (The current focus area of the interview)
+
+The Agent's response is a structured Pydantic model (ManagementPlanOutput), where
+specific fields are repurposed for conversational control:
+- primary_working_diagnosis: Used for flow control (either 'ASK_QUESTION' or the final diagnosis).
+- differential_diagnosis[0]: Used to hold the next question for the user.
+- physician_note: Used to store the running, cumulative medical history.
+- follow_up_recommendation: Used to hold the string for the NEXT history section.
+
+The function terminates when the Agent signals that the 'Current_Section' is 'DONE',
+at which point it prints the final collected history and the complete,
+structured Management Plan.
+"""
+
 import json
+
 from agents import Agent, Runner
-from models.openai_model_output import ManagementPlanOutput  # Import the model
+from models.openai_model_output import ManagementPlanOutput
 
 # --- Agent Instructions ---
 AGENT_INSTRUCTIONS = """

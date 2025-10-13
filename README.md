@@ -1,10 +1,10 @@
-# 🩺 Conversational Medical Assistant Agent
+# Conversational Medical Assistant Agent
 
 This project implements a structured, conversational AI agent designed to perform comprehensive patient history-taking. The agent guides the user through a sequential interview process (PC, HPI, PMH, etc.), synthesizes the information in real-time, and concludes by generating a final, structured JSON management plan, including the differential diagnosis and initial therapeutic recommendations.
 
 The agent leverages the capabilities of modern LLMs (specifically `gpt-4o-mini`) combined with Pydantic schemas for reliable, structured output at every step.
 
-## ✨ Features
+## Features
 
 * **Structured Interview Flow:** Follows a fixed, clinical sequence: Presenting Complaint (PC) → History of Presenting Complaint (HPI) → Past Medical History (PMH) → Medications (MEDS) → Social History (SH) → Family History (FH) → DONE.
 * **Real-time History Synthesis:** Maintains a running, synthesized patient narrative in the `physician_note` field.
@@ -12,7 +12,7 @@ The agent leverages the capabilities of modern LLMs (specifically `gpt-4o-mini`)
 * **Structured Final Output:** Upon completion of the history, the agent generates a comprehensive `ManagementPlanOutput` JSON object, including a primary working diagnosis, diagnostic plan, and therapeutic plan.
 * **Modular Design:** Code is structured across multiple files (`main.py`, `medical_agent.py`, `models/`) for improved maintainability.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
