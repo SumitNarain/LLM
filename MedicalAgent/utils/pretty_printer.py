@@ -1,5 +1,6 @@
 from MedicalAgent.models.openai_model_output import ManagementPlanOutput
 
+
 def print_management_plan(plan: ManagementPlanOutput):
     print("------------------------------------------------------------")
     print(" FINAL MANAGEMENT PLAN ")
@@ -18,25 +19,27 @@ def print_management_plan(plan: ManagementPlanOutput):
     if plan.diagnostic_plan:
         print("DIAGNOSTIC PLAN:")
         for test in plan.diagnostic_plan:
-            name = getattr(test, 'name', None) or test.get('name', '')
-            rationale = getattr(test, 'rationale', None) or test.get('rationale', '')
+            name = getattr(test, "name", None) or test.get("name", "")
+            rationale = getattr(test, "rationale", None) or test.get("rationale", "")
             print(f"  - {name}: {rationale}")
         print()
 
     if plan.therapeutic_plan:
         print("THERAPEUTIC PLAN:")
         for med in plan.therapeutic_plan:
-            name = getattr(med, 'name', None) or med.get('name', '')
-            dose = getattr(med, 'dose_route', None) or med.get('dose_route', '')
-            rationale = getattr(med, 'rationale', None) or med.get('rationale', '')
+            name = getattr(med, "name", None) or med.get("name", "")
+            dose = getattr(med, "dose_route", None) or med.get("dose_route", "")
+            rationale = getattr(med, "rationale", None) or med.get("rationale", "")
             print(f"  - {name} ({dose}) — {rationale}")
         print()
 
     if plan.patient_education_and_counseling:
         print("PATIENT EDUCATION AND COUNSELING:")
         for edu in plan.patient_education_and_counseling:
-            topic = getattr(edu, 'topic', None) or edu.get('topic', '')
-            instruction = getattr(edu, 'instruction', None) or edu.get('instruction', '')
+            topic = getattr(edu, "topic", None) or edu.get("topic", "")
+            instruction = getattr(edu, "instruction", None) or edu.get(
+                "instruction", ""
+            )
             print(f"  - {topic}: {instruction}")
         print()
 

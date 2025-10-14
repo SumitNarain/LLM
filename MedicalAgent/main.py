@@ -1,6 +1,7 @@
 import os
 import asyncio
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from MedicalAgent.med_agents.agent_runner import run_medical_interview
@@ -13,7 +14,7 @@ def check_environmental_variables():
     if not open_ai_key:
         raise ValueError("OPENAI_API_KEY is not in the .env file")
 
-# Standard Python entry point to run the asynchronous main function
+
 if __name__ == "__main__":
     try:
         check_environmental_variables()

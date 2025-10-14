@@ -34,11 +34,14 @@ agent = Agent(
     name="Conversational Medical Agent",
     instructions=BASE_AGENT_INSTRUCTIONS,
     model="gpt-4o-mini",
-    output_type=ManagementPlanOutput
+    output_type=ManagementPlanOutput,
 )
 
+
 # ---- Dynamic Prompt Builder ----
-def build_dynamic_prompt(base_instructions, current_section, user_response, history_so_far, asked_questions):
+def build_dynamic_prompt(
+    base_instructions, current_section, user_response, history_so_far, asked_questions
+):
     asked_text = "\n".join(f"- {q}" for q in asked_questions) or "None"
     return f"""
 You are currently in the section: **{current_section}**
@@ -62,6 +65,7 @@ If all sections are complete, set:
 {base_instructions}
 """
 
+
 # ---- Main Function ----
 async def conversational_history_taking():
     history_data = ""
@@ -82,7 +86,7 @@ async def conversational_history_taking():
         context_input = {
             "User_Response": user_input,
             "History_So_Far": history_data,
-            "Current_Section": current_section
+            "Current_Section": current_section,
         }
         context_string = json.dumps(context_input)
 
@@ -92,7 +96,7 @@ async def conversational_history_taking():
             current_section,
             user_input,
             history_data,
-            asked_questions
+            asked_questions,
         )
         agent.instructions = dynamic_prompt
 
@@ -101,7 +105,11 @@ async def conversational_history_taking():
             output = result.final_output
 
             next_action = (output.primary_working_diagnosis or "").strip().upper()
-            question_text = output.differential_diagnosis[0].strip() if output.differential_diagnosis else ""
+            question_text = (
+                output.differential_diagnosis[0].strip()
+                if output.differential_diagnosis
+                else ""
+            )
             history_data = output.physician_note or history_data
             next_section = (output.follow_up_recommendation or "").strip()
 
@@ -160,5 +168,3 @@ async def conversational_history_taking():
             print(f"\n❌ Error occurred: {e}")
             print(f"Last Context Sent: {context_string}")
             break
-
-

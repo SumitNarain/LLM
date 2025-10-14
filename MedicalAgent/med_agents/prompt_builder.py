@@ -1,4 +1,6 @@
-def build_dynamic_prompt(base_instructions, current_section, user_response, history_so_far, asked_questions):
+def build_dynamic_prompt(
+    base_instructions, current_section, user_response, history_so_far, asked_questions
+):
     asked_text = "\n".join(f"- {q}" for q in asked_questions) or "None"
     return f"""
             You are currently in the section: {current_section}
