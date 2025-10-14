@@ -20,9 +20,11 @@ async def obtain_medical_news():
     medical_research_agent = Agent(
         name="Medical Research Agent",
         instructions="You are are medical research assistant. You need to find all the recent medical research news articles",
-        tools=[WebSearchTool()]
+        tools=[WebSearchTool()],
     )
-    results = await Runner.run(medical_research_agent, "What is the most recent medical innovations?")
+    results = await Runner.run(
+        medical_research_agent, "What is the most recent medical innovations?"
+    )
     print(results)
 
 
