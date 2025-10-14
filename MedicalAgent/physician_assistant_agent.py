@@ -1,129 +1,164 @@
-"""
-Runs a structured, turn-based medical history interview using the OpenAI Agents SDK.
-
-The Agent manages the conversation flow, tracks the current section of the history
-(e.g., Presenting Complaint, Past Medical History), and formulates the next question.
-
-The communication between the orchestrator (this function) and the Agent is handled
-via a JSON string containing the current state:
-- User_Response (The patient's last answer)
-- History_So_Far (The running note of all collected history)
-- Current_Section (The current focus area of the interview)
-
-The Agent's response is a structured Pydantic model (ManagementPlanOutput), where
-specific fields are repurposed for conversational control:
-- primary_working_diagnosis: Used for flow control (either 'ASK_QUESTION' or the final diagnosis).
-- differential_diagnosis[0]: Used to hold the next question for the user.
-- physician_note: Used to store the running, cumulative medical history.
-- follow_up_recommendation: Used to hold the string for the NEXT history section.
-
-The function terminates when the Agent signals that the 'Current_Section' is 'DONE',
-at which point it prints the final collected history and the complete,
-structured Management Plan.
-"""
-
 import json
-
 from agents import Agent, Runner
 from models.openai_model_output import ManagementPlanOutput
 
-# --- Agent Instructions ---
-AGENT_INSTRUCTIONS = """
-    You are a medical assistant conducting a structured patient interview. Your final output must strictly adhere to the ManagementPlanOutput JSON schema.
+# ---- Base instructions for interview phase ----
+BASE_AGENT_INSTRUCTIONS = """
+You are a medical assistant conducting a structured patient interview.
 
-    **CRITICAL FLOW CONTROL INSTRUCTION:**
-    1.  For every interview step, the 'primary_working_diagnosis' field MUST contain the single string **'ASK_QUESTION'**.
-    2.  When the interview is complete (i.e., when Current_Section is 'DONE'), the 'primary_working_diagnosis' MUST contain the final diagnosis (e.g., 'Acute Heart Failure Exacerbation').
+**CRITICAL CONTROL INSTRUCTIONS:**
+- Ask **only one new question** relevant to the current section.
+- Use 'primary_working_diagnosis' = 'ASK_QUESTION' for ongoing interview.
+- When the interview is complete, set 'primary_working_diagnosis' = 'FINAL_DIAGNOSIS'
+  and 'follow_up_recommendation' = 'DONE'.
 
-    **RULES OF THE INTERVIEW:**
-    - **Current Section Tracking:** The 'follow_up_recommendation' field MUST contain the string for the **NEXT** section to be covered. Use the sequence: Presenting Complaint -> History of Presenting Complaint -> Past Medical History -> Medications -> Social History -> Family History -> DONE.
+**STRUCTURE:**
+- Put your next question in 'differential_diagnosis[0]'.
+- Add all collected history in 'physician_note'.
+- Indicate next section in 'follow_up_recommendation'.
 
-    **--- SEPARATED QUESTION AND HISTORY ---**
-    - **Question:** The question for the user MUST be placed in the **FIRST element of the 'differential_diagnosis' list**. Do NOT put any other content there during the interview phase.
-    - **History Collection:** The full, running narrative history collected so far MUST be placed and updated in the **'physician_note' field**. Do NOT include the question in this field.
+**SECTIONS:**
+Follow this order strictly:
+Presenting Complaint → History of Presenting Complaint → Past Medical History → Medications → Social History → Family History → DONE
 
-    - **Sequencing:** Follow the sequence: Presenting Complaint -> History of Presenting Complaint -> Past Medical History -> Medications -> Social History -> Family History. When Family History is complete, change the next section to 'DONE'.
+**DO NOT:**
+- Repeat any previously asked questions.
+- Rephrase already asked questions.
+- Continue asking questions after follow_up_recommendation == "DONE".
 
-    **State based on input:** User_Response='{{User_Response}}', History_So_Far='{{History_So_Far}}', Current_Section='{{Current_Section}}'
-
-    **Action:** If Current_Section is not 'DONE' and the section is incomplete, ask one question for the current section and set 'primary_working_diagnosis' to 'ASK_QUESTION'.
-    **Action:** If Current_Section is 'DONE', fill ALL fields of the ManagementPlanOutput based on the final history in 'physician_note', and set 'primary_working_diagnosis' to the final diagnosis.
+You must generate a NEW question every time.
 """
 
-# Initialize the Agent
+# ---- Initialize base agent ----
 agent = Agent(
     name="Conversational Medical Agent",
-    instructions=AGENT_INSTRUCTIONS,
+    instructions=BASE_AGENT_INSTRUCTIONS,
     model="gpt-4o-mini",
     output_type=ManagementPlanOutput
 )
 
+# ---- Dynamic Prompt Builder ----
+def build_dynamic_prompt(base_instructions, current_section, user_response, history_so_far, asked_questions):
+    asked_text = "\n".join(f"- {q}" for q in asked_questions) or "None"
+    return f"""
+You are currently in the section: **{current_section}**
 
+User's Last Answer:
+{user_response}
+
+Collected History So Far:
+{history_so_far}
+
+Questions already asked in any section:
+{asked_text}
+
+You MUST now generate ONE completely NEW question for the current section.
+Do not rephrase or repeat any previous question.
+
+If all sections are complete, set:
+- 'primary_working_diagnosis' = 'FINAL_DIAGNOSIS'
+- 'follow_up_recommendation' = 'DONE'
+
+{base_instructions}
+"""
+
+# ---- Main Function ----
 async def conversational_history_taking():
     history_data = ""
-    current_section = "Presenting Complaint (PC)"
+    current_section = "Presenting Complaint"
+    asked_questions = set()
 
     print("--- Starting Medical History Interview ---")
     print("Agent: Hello. What medical issues brought you in today?")
     user_input = input("You: ")
 
     while True:
-        contextual_input = {
+        # Stop condition safeguard (in case model loops)
+        if current_section.strip().upper() == "DONE":
+            print("\n✅ Interview complete (forced stop).")
+            break
+
+        # Build context for the agent
+        context_input = {
             "User_Response": user_input,
             "History_So_Far": history_data,
             "Current_Section": current_section
         }
-        context_string = json.dumps(contextual_input)
+        context_string = json.dumps(context_input)
+
+        # Build dynamic prompt
+        dynamic_prompt = build_dynamic_prompt(
+            BASE_AGENT_INSTRUCTIONS,
+            current_section,
+            user_input,
+            history_data,
+            asked_questions
+        )
+        agent.instructions = dynamic_prompt
 
         try:
-            # 2. Run the agent for one turn (expecting a structured output)
             result = await Runner.run(agent, context_string)
             output = result.final_output
 
-            # 3. Extract conversational fields from the final model output
-            next_action_str = output.primary_working_diagnosis.upper().strip()
+            next_action = (output.primary_working_diagnosis or "").strip().upper()
+            question_text = output.differential_diagnosis[0].strip() if output.differential_diagnosis else ""
+            history_data = output.physician_note or history_data
+            next_section = (output.follow_up_recommendation or "").strip()
 
-            # History is extracted from the physician_note field
-            history_data = output.physician_note or ""
+            # --- Stop interview when DONE ---
+            if next_section.upper() == "DONE" or next_action == "FINAL_DIAGNOSIS":
+                print("\n✅ Interview complete. Generating final management plan...")
 
-            # Question is extracted from the differential_diagnosis list (first element)
-            question_text = output.differential_diagnosis[0] if output.differential_diagnosis else ""
+                # ----- PHASE 2: MANAGEMENT PLAN GENERATION -----
+                plan_prompt = f"""
+                You are a senior physician generating a structured management plan
+                based on the following collected history:
+                
+                {history_data}
+                
+                Now produce a complete JSON output in the **ManagementPlanOutput** format:
+                - 'differential_diagnosis': 3–5 plausible causes based on history.
+                - 'primary_working_diagnosis': The most likely diagnosis.
+                - 'diagnostic_plan': 2–4 DiagnosticTest objects with name and rationale.
+                - 'therapeutic_plan': 2–3 MedicationOrder objects with name, dose_route, and rationale.
+                - 'patient_education_and_counseling': 3–5 EducationInstruction objects (topic + instruction).
+                - 'follow_up_recommendation': e.g. "Follow up in 3 days" or "Refer to gastroenterologist".
+                - 'physician_note': Concise summary of key findings and plan.
+                
+                Respond **only** with a valid JSON matching the ManagementPlanOutput schema.
+                """
+                agent.instructions = plan_prompt
+                result = await Runner.run(agent, history_data)
+                final_output = result.final_output
 
-            # The agent is responsible for setting the *next* section
-            next_section = output.follow_up_recommendation.strip()
-            current_section = next_section
+                print("\n--- Final Management Plan ---")
+                print(final_output.model_dump_json(indent=4))
+                break
 
-            if next_action_str == "ASK_QUESTION":
-                if not question_text:
-                    print("\n!!! Agent returned no question. Continuing with default flow. !!!")
-                    user_input = input("You: ")
-                    continue
+            # Handle repeated or missing question edge case
+            if not question_text or question_text in asked_questions:
+                print("\n⚠️ Agent returned a repeated or invalid question. Skipping.")
+                user_input = input("You (clarify previous answer or skip): ")
+                continue
 
+            # Track asked questions to avoid repeats
+            asked_questions.add(question_text)
+
+            if next_action == "ASK_QUESTION":
                 print(f"\n[Current Section: {current_section}]")
                 print(f"Agent: {question_text}")
-
                 user_input = input("You: ")
+                current_section = next_section or current_section
+                continue
 
-            elif current_section == "DONE" or next_action_str != "ASK_QUESTION":
-                # Final plan logic
-                print("\n--- History Complete. Final Plan Generated. ---")
-                print(f"Final History Collected (from Agent):\n{history_data}")
-
-                print("\n--- GENERATED MANAGEMENT PLAN (ManagementPlanOutput Model) ---")
-                print(output.model_dump_json(indent=4))
-                print("---------------------------------------------------------")
-                break
-
-            else:
-                # Fallback for unexpected model output
-                print("\n------------------- DEBUG INFORMATION -------------------")
-                print(f"Agent returned UNKNOWN ACTION/STATE. primary_working_diagnosis: {next_action_str}")
-                print(f"Full Output Received:\n{output.model_dump_json(indent=2)}")
-                print("---------------------------------------------------------")
-                print("Stopping.")
-                break
+            # Handle any unexpected model response
+            print("\n⚠️ Unexpected agent response. Dumping debug info:")
+            print(output.model_dump_json(indent=4))
+            break
 
         except Exception as e:
-            print(f"\n!!! An error occurred during the agent run: {e} !!!")
+            print(f"\n❌ Error occurred: {e}")
             print(f"Last Context Sent: {context_string}")
             break
+
+

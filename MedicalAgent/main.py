@@ -1,12 +1,11 @@
-# main.py
-
 import os
 import asyncio
 from dotenv import load_dotenv
-from physician_assistant_agent import conversational_history_taking
+load_dotenv()
+
+from MedicalAgent.med_agents.agent_runner import run_medical_interview
 from medical_research_agent import obtain_medical_news
 
-load_dotenv()
 
 def check_environmental_variables():
     open_ai_key = os.environ.get("OPENAI_API_KEY")
@@ -18,7 +17,7 @@ def check_environmental_variables():
 if __name__ == "__main__":
     try:
         check_environmental_variables()
-        asyncio.run(conversational_history_taking())
+        asyncio.run(run_medical_interview())
     except ValueError as e:
         print(f"Configuration Error: {e}")
     except Exception as e:
