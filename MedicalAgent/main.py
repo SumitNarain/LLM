@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from MedicalAgent.med_agents.agent_runner import run_medical_interview
-from medical_research_agent import obtain_medical_news
 
 
 def check_environmental_variables():
